@@ -103,21 +103,21 @@ getFirstGenre <- function(genreList) {
 
 # add column with genre of artist 0
 genreCollaborations["genre_0"] <- nodes[match(genreCollaborations$id_0, nodes$spotify_id), "genres"]
-
-# keep only first genre per artist
-genreCollaborations$genre_0 <- lapply(genreCollaborations$genre_0, getFirstGenre)
-
 # add column with genre of artist 1
 genreCollaborations["genre_1"] <- nodes[match(genreCollaborations$id_1, nodes$spotify_id), "genres"]
 
-# keep only first genre
-genreCollaborations$genre_1 <- lapply(genreCollaborations$genre_1, getFirstGenre)
+# keep only first genre per artist
+genreCollaborations$genre_0 <- sapply(genreCollaborations$genre_0, getFirstGenre)
+genreCollaborations$genre_1 <- sapply(genreCollaborations$genre_1, getFirstGenre)
 
 # remove rows with unknown genre
 genreCollaborations <- subset(genreCollaborations, genre_0 != "NA" & genre_1 != "NA")
 
-# create network visualization
-genreGraph <- graph_from_data_frame(genreCollaborations, directed = FALSE)
-plot(genreGraph, vertex.label = NA, vertex.size = 5, vertex.color = "blue", edge.width = 0.1)
+# remove rows with same genre
+genreCollaborations <- subset(genreCollaborations, genre_0 != genre_1)
+# remove first two columns
+genreCollaborations <- genreCollaborations[, -c(1, 2)]
+
+# create graph
 ```
 
