@@ -1,0 +1,75 @@
+Datensatz: spotify daten, diese bestehen aus edges und nodes. In edges sind Kollaborationen zwischen zwei Künstlern festgehalten. In den Nodes stehen Zusatzinformationen zu allen Künstlern wie Genre, Follower und Beliebtheit
+
+
+Einlesen der Datensätze
+```{r}
+
+library("igraph")
+edges <- read.csv("./data/edges.csv", header = TRUE)
+nodes <- read.csv("./data/nodes.csv", header = TRUE)
+```
+
+
+1. Forschungsfrage zum Erkunden des Datensatzes:
+  Welches "Künstlerpaar" hatte die meisten Kollaborationen
+
+Benötigt werden hierfür sowohl Edges, als auch Nodes da in den Nodes die Künster nicht mit ihrem Namen enthalten sind, sondern mit einer eindeutigen Identifikationsnummer. Durch diese und die Nodes kann jeder ID der entsprechende Künstlername zugeordnet werden
+
+```{r}
+library("tidyverse")
+library("dplyr")
+# Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
+
+
+filteredEdges <- edges[edges$id_0 %in% nodes$spotify_id, ]
+filteredEdges <- filteredEdges[filteredEdges$id_1 %in% nodes$spotify_id, ]
+
+# Anzahl der Künstler, die mehr als eine Kollaboration hatten:
+counts <- group_size(group_by(filteredEdges, id_0, id_1))
+counts[counts > 1]
+```
+2. Forschungsfrage:
+  Welche Genres sind am häufigsten in dem Datensatz enthalten
+
+```{r}
+
+# Add column with genre of artist 0
+filteredEdges["genre_0"] <- nodes[match(filteredEdges$id_0, nodes$spotify_id), "genres"]
+# Add column with genre of artist 1
+filteredEdges["genre_1"] <- nodes[match(filteredEdges$id_1, nodes$spotify_id), "genres"]
+
+
+# transform the rows genre_0 and genre_1 into a vector
+filteredEdges$genre_0 <- as.vector(filteredEdges$genre_0)
+filteredEdges$genre_1 <- as.vector(filteredEdges$genre_1)
+
+# create a new column with the genres of both artists
+filteredEdges$genres <- paste(filteredEdges$genre_0, filteredEdges$genre_1, sep = ", ")
+
+# remove the columns genre_0 and genre_1
+filteredEdges <- filteredEdges[, -c(3, 4)]
+
+
+#  count the genres
+genreCounts <- table(unlist(strsplit(as.character(filteredEdges$genres), ", ")))
+genreCounts <- as.data.frame(genreCounts)
+colnames(genreCounts) <- c("genre", "count")
+genreCounts <- genreCounts[order(genreCounts$count, decreasing = TRUE), ]
+
+# remove [ and ] from the genres
+genreCounts$genre <- str_replace(genreCounts$genre, "\\[\\]", "unknown")
+genreCounts$genre <- gsub("\\[", "", genreCounts$genre)
+genreCounts$genre <- gsub("\\]", "", genreCounts$genre)
+
+#  replace empty strings with "unknown"
+
+# plot the top 10 genres
+ggplot(genreCounts[1:10, ], aes(x = reorder(genre, count), y = count)) +
+  geom_bar(stat = "identity") +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  labs(x = "Genre", y = "Count")
+```
+
+-> Die häufigsten Genres sind Pop, edm und electro house
+  -> Dennoch sind die meisten Kollaborationen mit einem oder beiden Künstlern ohne zugeordnetes Genre
+
