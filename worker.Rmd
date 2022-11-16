@@ -90,6 +90,8 @@ Hierfür wird lediglich ein genre pro Künstler betrachtet
 
 
 ```{r}
+library(GGally)
+library(network)
 genreCollaborations <- filteredEdges[, c(1, 2)]
 
 getFirstGenre <- function(genreList) {
@@ -118,6 +120,7 @@ genreCollaborations <- subset(genreCollaborations, genre_0 != genre_1)
 # remove first two columns
 genreCollaborations <- genreCollaborations[, -c(1, 2)]
 
-# create graph
+# create plot using ggnet2
 ```
+
 
