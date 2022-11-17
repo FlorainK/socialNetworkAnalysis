@@ -21,6 +21,7 @@ library("dplyr")
 library(GGally)
 library(network)
 library(tibble)
+library(networkD3)
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
 
 
@@ -147,19 +148,74 @@ Weitere Idee:
   Wie Kollaborieren die 20 größten Artists miteinander
 
 ```{r}
-
-library(networkD3)
-# get the 20 biggest artists
+# get the 5 biggest artists
 biggestArtists <- nodes[order(nodes$followers, decreasing = TRUE), ][1:5, ]
 
-# get the collaborations of the 20 biggest artists
-biggestArtistsCollaborations <- subset(filteredEdges, id_0 %in% biggestArtists$spotify_id | id_1 %in% biggestArtists$spotify_id)
 
+# get the collaborations of the 5 biggest artists
+biggestArtistsCollaborationsEdges <- subset(filteredEdges, id_0 %in% biggestArtists$spotify_id | id_1 %in% biggestArtists$spotify_id)
+rownames(biggestArtistsCollaborationsEdges) <- NULL
+# rename id_0 to source and id_1 to target
+colnames(biggestArtistsCollaborationsEdges) <- c("source", "target")
+
+# filter nodes if they are not in biggestArtistsCollaborations
+biggestArtistsNodes <- nodes[nodes$spotify_id %in% biggestArtistsCollaborationsEdges$source | nodes$spotify_id %in% biggestArtistsCollaborationsEdges$target, ]
+biggestArtistsNodes$new_id <- as.numeric(factor(biggestArtistsNodes$spotify_id))
+
+#  replace each id in biggestArtistsCollaborations with the new_id
+biggestArtistsCollaborationsEdges$source <- biggestArtistsNodes[match(biggestArtistsCollaborationsEdges$source, biggestArtistsNodes$spotify_id), "new_id"]
+biggestArtistsCollaborationsEdges$target <- biggestArtistsNodes[match(biggestArtistsCollaborationsEdges$target, biggestArtistsNodes$spotify_id), "new_id"]
+
+
+# replace each id in biggestArtistsNodes with a consecutive number starting at 1
+
+
+# print row where spotify_id is '215', '253'
+biggestArtistsNodes[biggestArtistsNodes$new_id %in% c(215, 253), ]
+
+
+# somehow "Armaan Malik" and "SLAVA MARLOW" are twice in the dataset -> remove one of them
+biggestArtistsNodes <- subset(biggestArtistsNodes, !(new_id == 215 & name == "Armaan Malik" & followers == 5))
+biggestArtistsNodes <- subset(biggestArtistsNodes, !(new_id == 253 & name == "SLAVA MARLOW" & followers == 347))
+
+# order the nodes by spotify_id
+biggestArtistsNodes <- biggestArtistsNodes[order(biggestArtistsNodes$spotify_id), ]
+
+# set spotify_id as rownames
+rownames(biggestArtistsNodes) <- biggestArtistsNodes$new_id
+
+
+# drop spotify_id column
+biggestArtistsNodes <- biggestArtistsNodes[, -1]
 # replace the spotify ids with the artist names
-biggestArtistsCollaborations$id_0 <- nodes[match(biggestArtistsCollaborations$id_0, nodes$spotify_id), "name"]
-biggestArtistsCollaborations$id_1 <- nodes[match(biggestArtistsCollaborations$id_1, nodes$spotify_id), "name"]
+# biggestArtistsCollaborationsEdges$id_0 <- nodes[match(biggestArtistsCollaborationsEdges$id_0, nodes$spotify_id), "name"]
+# biggestArtistsCollaborationsEdges$id_1 <- nodes[match(biggestArtistsCollaborationsEdges$id_1, nodes$spotify_id), "name"]
 
-
-p <- simpleNetwork(biggestArtistsCollaborations)
+# lower source and target by 1
+biggestArtistsCollaborationsEdges$source <- biggestArtistsCollaborationsEdges$source - 1
+biggestArtistsCollaborationsEdges$target <- biggestArtistsCollaborationsEdges$target - 1
+p <- simpleNetwork(biggestArtistsCollaborationsEdges)
 saveNetwork(p, file = "biggestArtistsCollaborations.html")
+
+d <- forceNetwork(
+  Links = biggestArtistsCollaborationsEdges,
+  Nodes = biggestArtistsNodes,
+  Source = "source",
+  Target = "target",
+  NodeID = "name",
+  Group = "genres",
+  opacity = 0.5,
+)
+
+saveNetwork(d, file = "biggestArtistsCollaborations2.html")
 ```
+
+```{r}
+data(MisLinks)
+data(MisNodes)
+
+d <- MisLinks
+n <- MisNodes
+```
+
+further Ideas:
