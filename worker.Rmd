@@ -185,11 +185,22 @@ biggestArtistsNodes <- biggestArtistsNodes[order(biggestArtistsNodes$spotify_id)
 rownames(biggestArtistsNodes) <- biggestArtistsNodes$new_id
 
 
-# drop spotify_id column
-biggestArtistsNodes <- biggestArtistsNodes[, -1]
 # replace the spotify ids with the artist names
 # biggestArtistsCollaborationsEdges$id_0 <- nodes[match(biggestArtistsCollaborationsEdges$id_0, nodes$spotify_id), "name"]
 # biggestArtistsCollaborationsEdges$id_1 <- nodes[match(biggestArtistsCollaborationsEdges$id_1, nodes$spotify_id), "name"]
+
+# add column with true or false if artist in biggestArtists to biggestArtistsNodes
+biggestArtistsNodes <- cbind(biggestArtistsNodes, isBiggestArtist = biggestArtistsNodes$spotify_id %in% biggestArtists$spotify_id)
+
+# drop spotify_id column
+biggestArtistsNodes <- biggestArtistsNodes[, -1]
+# print lines where isBiggestArtist is true
+biggestArtistsNodes[biggestArtistsNodes$isBiggestArtist == TRUE, ]
+
+# change the wording of isbiggestArtist to "TOP 5" or "OTHER"
+biggestArtistsNodes$isBiggestArtist <- ifelse(biggestArtistsNodes$isBiggestArtist == TRUE, "TOP 5", "OTHER")
+
+
 
 # lower source and target by 1
 biggestArtistsCollaborationsEdges$source <- biggestArtistsCollaborationsEdges$source - 1
@@ -203,12 +214,17 @@ d <- forceNetwork(
   Source = "source",
   Target = "target",
   NodeID = "name",
-  Group = "genres",
-  opacity = 0.5,
+  Group = "isBiggestArtist",
+  opacity = 0.8,
+  fontSize = 20,
+  Nodesize = "followers",
+  radiusCalculation = JS("(d.nodesize / 10000000)+5"),
+  zoom = TRUE,
+  colourScale = JS("d3.scaleOrdinal([ '#05f2fa','#021433'])"),
 )
 
 saveNetwork(d, file = "biggestArtistsCollaborations2.html")
-```
+  ```
 
 ```{r}
 data(MisLinks)
