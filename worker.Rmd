@@ -18,6 +18,9 @@ Benötigt werden hierfür sowohl Edges, als auch Nodes da in den Nodes die Küns
 ```{r}
 library("tidyverse")
 library("dplyr")
+library(GGally)
+library(network)
+library(tibble)
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
 
 
@@ -90,9 +93,7 @@ Hierfür wird lediglich ein genre pro Künstler betrachtet
 
 
 ```{r}
-library(GGally)
-library(network)
-library(tibble)
+
 genreCollaborations <- filteredEdges[, c(1, 2)]
 
 getFirstGenre <- function(genreList) {
@@ -144,3 +145,21 @@ ggplot(genreDegree[1:10, ], aes(x = reorder(genre, degree), y = degree)) +
 
 Weitere Idee:
   Wie Kollaborieren die 20 größten Artists miteinander
+
+```{r}
+
+library(networkD3)
+# get the 20 biggest artists
+biggestArtists <- nodes[order(nodes$followers, decreasing = TRUE), ][1:5, ]
+
+# get the collaborations of the 20 biggest artists
+biggestArtistsCollaborations <- subset(filteredEdges, id_0 %in% biggestArtists$spotify_id | id_1 %in% biggestArtists$spotify_id)
+
+# replace the spotify ids with the artist names
+biggestArtistsCollaborations$id_0 <- nodes[match(biggestArtistsCollaborations$id_0, nodes$spotify_id), "name"]
+biggestArtistsCollaborations$id_1 <- nodes[match(biggestArtistsCollaborations$id_1, nodes$spotify_id), "name"]
+
+
+p <- simpleNetwork(biggestArtistsCollaborations)
+saveNetwork(p, file = "biggestArtistsCollaborations.html")
+```
