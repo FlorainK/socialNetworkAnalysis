@@ -4,7 +4,14 @@ Datensatz: spotify daten, diese bestehen aus edges und nodes. In edges sind Koll
 Einlesen der Datensätze
 ```{r}
 
-library("igraph")
+install_if_not <- function(pkg) {
+  if (!require(pkg, character.only = TRUE)) {
+    install.packages(pkg)
+    library(pkg, character.only = TRUE)
+  }
+}
+
+install_if_not("igraph")
 edges <- read.csv("./data/edges.csv", header = TRUE)
 nodes <- read.csv("./data/nodes.csv", header = TRUE)
 ```
@@ -16,12 +23,15 @@ nodes <- read.csv("./data/nodes.csv", header = TRUE)
 Benötigt werden hierfür sowohl Edges, als auch Nodes da in den Nodes die Künster nicht mit ihrem Namen enthalten sind, sondern mit einer eindeutigen Identifikationsnummer. Durch diese und die Nodes kann jeder ID der entsprechende Künstlername zugeordnet werden
 
 ```{r}
-library("tidyverse")
-library("dplyr")
-library(GGally)
-library(network)
-library(tibble)
+install_if_not("tidyverse")
+install_if_not("dplyr")
+install_if_not("GGally")
+install_if_not("network")
+install_if_not("tibble")
+install_if_not("networkD3")
+install_if_not("data.table")
 library(networkD3)
+library(data.table)
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
 
 
@@ -141,11 +151,15 @@ ggplot(genreDegree[1:10, ], aes(x = reorder(genre, degree), y = degree)) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "Genre", y = "Degree", title = "Top 10 Genres by Degree")
+
+#  Genres sind alphabetisch sortiert - daher ist die Betrachtung lediglich des ersten Genres nicht repräsentativ
 ```
 
 
 Weitere Idee:
   Wie Kollaborieren die 20 größten Artists miteinander
+  Learning: 20 größten Artists hatten so viele Kollaborationen, dass die Visualisierung nicht mehr möglich war
+  -> Lediglich 5 Größten und deren Features wurden betrachtet
 
 ```{r}
 # get the 5 biggest artists
@@ -160,6 +174,8 @@ colnames(biggestArtistsCollaborationsEdges) <- c("source", "target")
 
 # filter nodes if they are not in biggestArtistsCollaborations
 biggestArtistsNodes <- nodes[nodes$spotify_id %in% biggestArtistsCollaborationsEdges$source | nodes$spotify_id %in% biggestArtistsCollaborationsEdges$target, ]
+
+# replace the id by a number
 biggestArtistsNodes$new_id <- as.numeric(factor(biggestArtistsNodes$spotify_id))
 
 #  replace each id in biggestArtistsCollaborations with the new_id
@@ -221,6 +237,7 @@ d <- forceNetwork(
   radiusCalculation = JS("(d.nodesize / 10000000)+5"),
   zoom = TRUE,
   colourScale = JS("d3.scaleOrdinal([ '#05f2fa','#021433'])"),
+  legend = TRUE,
 )
 
 saveNetwork(d, file = "biggestArtistsCollaborations2.html")
@@ -235,3 +252,140 @@ n <- MisNodes
 ```
 
 further Ideas:
+Betrachtung der Chartplazierungen:
+  - Wie spielen Followerzahl und Chartplazierung zusammen?
+  (Korrelationen)
+  (Followerzahl eines einzelnen Artists, sowie durchschnitt der  beiden)
+  - Wie spielen Genre und Chartplazierung zusammen?
+
+
+Betrachung der deutschen Musikszene:
+
+
+WElche Genres haben die meisten follower
+
+```{r}
+
+
+# get a list of all genres
+genres <- unlist(strsplit(nodes$genres, ","))
+# remove empty strings, remove whitespaces, [ and ], and ' from the strings
+genres <- gsub(" ", "", genres)
+genres <- gsub("\\[", "", genres)
+genres <- gsub("\\]", "", genres)
+genres <- gsub("'", "", genres)
+# remove empty strings
+genres <- genres[genres != ""]
+# get the unique genres
+genres <- unique(genres)
+
+# create a dataframe with the genres and the number of followers
+genresFollowers <- data.frame(genre = genres, followers = 0)
+
+# create function to get the number of followers for a genre
+getFollowers <- function(genre) {
+  return(sum(nodes[nodes$name %like% sprintf("%s", genre), ]$followers))
+}
+
+# for each genre, add the followers of the artists that have this genre
+genresFollowers$followers <- sapply(genresFollowers$genre, getFollowers)
+
+
+nodes[nodes$name %like% "'rap'", ]
+# sort the genres by the number of followers
+genresFollowers <- genresFollowers[order(genresFollowers$followers, decreasing = TRUE), ]
+
+# plot the genres with the most followers
+barplot(genresFollowers$followers, names.arg = genresFollowers$genre, las = 2, cex.names = 0.5, col = "blue")
+```
+
+Korrelation der Follower von Artist 1 und Artist 2
+
+```{r}
+# create new dataframe with the spotify_ids of the artists
+followerDataframe <- filteredEdges
+
+# replace the spotify id by the number of followers
+followerDataframe$id_0 <- nodes[match(followerDataframe$id_0, nodes$spotify_id), "followers"]
+followerDataframe$id_1 <- nodes[match(followerDataframe$id_1, nodes$spotify_id), "followers"]
+
+
+# rename the columns
+colnames(followerDataframe) <- c("followers_0", "followers_1")
+
+followerDataframe$followers_0
+
+# calculate the correlation of the followers
+cor(followerDataframe$followers_0, followerDataframe$followers_1, use = "complete.obs")
+```
+
+Plot der deutschen Musikszene
+
+```{r}
+#  get all german artists
+germanArtistsNodes <- nodes[nodes$genre %like% "german" | nodes$genre %like% "deutsch", ]
+
+# filter all edges if they are german artists
+# -> Nur einer der beiden muss deutsch sein
+germanArtistsEdges <- subset(edges, id_0 %in% germanArtistsNodes$spotify_id | id_1 %in% germanArtistsNodes$spotify_id)
+
+# add non german artits from the edges to the germanArtistsNodes
+germanArtistsNodes <- rbind(germanArtistsNodes, nodes[match(germanArtistsEdges$id_0, nodes$spotify_id), ])
+germanArtistsNodes <- rbind(germanArtistsNodes, nodes[match(germanArtistsEdges$id_1, nodes$spotify_id), ])
+
+
+# rename id_0 to source and id_1 to target
+colnames(germanArtistsEdges) <- c("source", "target")
+
+# replace the id in germanArtists by a number from 1 to n
+germanArtistsNodes$spotify_id <- as.numeric(factor(germanArtistsNodes$spotify_id))
+
+
+#  replace each id in biggestArtistsCollaborations with the new_id
+germanArtistsEdges$source <- as.numeric(factor(germanArtistsEdges$source))
+germanArtistsEdges$target <- as.numeric(factor(germanArtistsEdges$target))
+
+
+# order the nodes by spotify_id
+germanArtistsNodes <- germanArtistsNodes[order(germanArtistsNodes$spotify_id), ]
+
+# drop duplicates
+germanArtistsNodes <- germanArtistsNodes[!duplicated(germanArtistsNodes$spotify_id), ]
+# set spotify_id as rownames
+rownames(germanArtistsNodes) <- germanArtistsNodes$spotify_id
+
+# add column with true or false if artist in germanArtistsNodes
+germanArtistsNodes$isGerman <- germanArtistsNodes$spotify_id %in% germanArtistsNodes$spotify_id
+
+
+# drop spotify_id column
+germanArtistsNodes <- germanArtistsNodes[, -1]
+
+# change the wording of isGerman to "TOP 5" or "OTHER"
+germanArtistsNodes$isGerman <- ifelse(germanArtistsNodes$isGerman == TRUE, "TOP 5", "OTHER")
+
+# lower source and target by 1
+germanArtistsEdges$source <- germanArtistsEdges$source - 1
+germanArtistsEdges$target <- germanArtistsEdges$target - 1
+
+# create the network
+
+d <- forceNetwork(
+  Links = germanArtistsEdges,
+  Nodes = germanArtistsNodes,
+  Source = "source",
+  Target = "target",
+  NodeID = "name",
+  Group = "isGerman",
+  opacity = 0.8,
+  fontSize = 20,
+  Nodesize = "followers",
+  radiusCalculation = JS("(d.nodesize / 1000000)+5"),
+  zoom = TRUE,
+  colourScale = JS("d3.scaleOrdinal([ '#05f2fa','#021433'])"),
+  legend = TRUE,
+)
+
+saveNetwork(d, file = "germanMusicScene.html")
+```
+
