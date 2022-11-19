@@ -22,12 +22,11 @@ install_if_not("network")
 install_if_not("tibble")
 install_if_not("networkD3")
 install_if_not("data.table")
-)
+install_if_not("ggplot2")
 
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
 filteredEdges <- edges[edges$id_0 %in% nodes$spotify_id, ]
 filteredEdges <- filteredEdges[filteredEdges$id_1 %in% nodes$spotify_id, ]
-
 ```
 1. Forschungsfrage:
   Welche Genres sind am häufigsten in dem Datensatz enthalten
@@ -87,8 +86,6 @@ noGenre <- nodes %>%
 popDance <- nodes %>%
   filter(genres %like% "pop dance" & genres %like% "dance pop") %>%
   count()
-
-
 ```
 
 
@@ -192,18 +189,19 @@ biggestGermanArtistsCollaborations <- filteredEdges %>%
   count()
 
 # get the count of genres of the biggest artists
-genreCount <- nodes %>%
-  filter(spotify_id %in% biggestArtists$spotify_id) %>%
-  mutate(genres = strsplit(genres, ",")) %>%
-  unnest(genres) %>%
-  count(genres)
+biggestArtists$genres <- sapply(biggestArtists$genres, numberOfGenres)
+mean(biggestArtists$genres)
 
 # get the count of genres of the biggest german artists
-genreCountGerman <- nodes %>%
-  filter(spotify_id %in% biggestGermanArtists$spotify_id) %>%
-  mutate(genres = strsplit(genres, ",")) %>%
-  unnest(genres) %>%
-  count(genres)
+biggestGermanArtists$genres <- sapply(biggestGermanArtists$genres, numberOfGenres)
+mean(biggestGermanArtists$genres)
+
+# get average popularity of the biggest artists
+mean(biggestArtists$popularity)
+mean(biggestGermanArtists$popularity)
+
+#  correlation of popularity and followers
+cor(nodes$popularity, nodes$followers, use = "complete.obs")
 ```
 
 5. Forschungsfrage:
@@ -287,8 +285,6 @@ saveNetwork(d, file = "biggestArtistsCollaborations2.html")
 2. Forschungsfrage:
   Welche Genres besitzen die größte Reichweite?
 ```{r}
-
-
 # get a list of all genres
 genres <- unlist(strsplit(nodes$genres, ","))
 # remove empty strings, remove whitespaces, [ and ], and ' from the strings
@@ -298,11 +294,23 @@ genres <- gsub("'", "", genres)
 # remove empty strings
 genres <- genres[genres != ""]
 # get the unique genres
-genres <- unique(genres)
 
+# cut leading and tailing whitespaces
+genres <- gsub("^\\s+|\\s+$", "", genres)
+
+#  delete empty strings
+genres <- genres[genres != ""]
+
+genres <- unique(genres)
 length(genres)
+
 # create a dataframe with the genres and the number of followers
 genresFollowers <- data.frame(genre = genres, followers = 0)
+
+# get duplicates
+duplicates <- duplicated(genresFollowers$genre)
+
+
 
 # create function to get the number of followers for a genre
 getFollowers <- function(genre) {
@@ -314,14 +322,33 @@ getFollowers <- function(genre) {
 genresFollowers$followers <- sapply(genresFollowers$genre, getFollowers)
 
 
-nodes[nodes$name %like% "'rap'", ]
 # sort the genres by the number of followers
 genresFollowers <- genresFollowers[order(genresFollowers$followers, decreasing = TRUE), ]
 
-# plot the genres with the most followers and safe it as a png
-barplot(genresFollowers$followers, names.arg = genresFollowers$genre, las = 2, cex.names = 0.5, col = "blue")
-dev.copy(png, file = "genresFollowers.png")
-dev.off()
+# drop duplicated genres
+genresFollowers <- genresFollowers[!duplicated(genresFollowers$genre), ]
+
+
+library(scales)
+# plot top 10 genres and safe
+topFollowed <- ggplot(genresFollowers[1:10, ], aes(x = reorder(genre, followers, decreasing = TRUE), y = followers)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genre", y = "Number of followers") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_discrete(labels = scales::comma)
+ggsave("topFollowed.png", topFollowed)
+
+# plot top 10 genres and safe
+topFollowed <- ggplot(genresFollowers[1:10, ], aes(x = reorder(genre, followers, decreasing = TRUE), y = followers)) +
+  geom_bar(stat = "identity") +
+  labs(x = "Genre", y = "Number of followers") +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
+  scale_y_discrete(labels = scales::comma)
+ggsave("topFollowed.png", topFollowed)
+
+
 
 # function to get average followers for a genre
 getAvgFollowers <- function(genre) {
@@ -342,6 +369,9 @@ barplot(genresAvgFollowers$avgFollowers, names.arg = genresAvgFollowers$genre, l
 dev.copy(png, file = "genresAvgFollowers.png")
 dev.off()
 
+# save the dataframes as csv
+write.csv(genresFollowers, file = "genresFollowers.csv")
+write.csv(genresAvgFollowers, file = "genresAvgFollowers.csv")
 ```
 
 5. Forschungsfrage
