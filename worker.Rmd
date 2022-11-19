@@ -71,7 +71,7 @@ ggplot(genreCounts[1:10, ], aes(x = reorder(genre, count), y = count)) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "Genre", y = "Count of Collaborations", title = "Top 10 Genres in the Dataset")
-ggsave("top10genres.png", width = 10, height = 5)
+ggsave("./visualizations/top10genres.png", width = 10, height = 5)
 
 
 # calculate mean number of genres per artist
@@ -214,7 +214,7 @@ d <- forceNetwork(
   legend = TRUE,
 )
 
-saveNetwork(d, file = "biggestArtistsCollaborations2.html")
+saveNetwork(d, file = "./visualizations/biggestArtistsCollaborations.html")
   ```
 
 2. Forschungsfrage:
@@ -272,7 +272,7 @@ topFollowed <- ggplot(genresFollowers[1:10, ], aes(x = reorder(genre, followers,
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_discrete(labels = scales::comma)
-ggsave("topFollowed.png", topFollowed)
+ggsave("./visualizations/topFollowed.png", topFollowed)
 
 # plot top 10 genres and safe
 topFollowed <- ggplot(genresFollowers[1:10, ], aes(x = reorder(genre, followers, decreasing = TRUE), y = followers)) +
@@ -281,7 +281,7 @@ topFollowed <- ggplot(genresFollowers[1:10, ], aes(x = reorder(genre, followers,
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   scale_y_discrete(labels = scales::comma)
-ggsave("topFollowed.png", topFollowed)
+ggsave("./visualizations/topFollowed.png", topFollowed)
 
 
 
@@ -370,7 +370,7 @@ n <- forceNetwork(
   legend = TRUE,
 )
 
-saveNetwork(n, file = "germanMusicScene.html")
+saveNetwork(n, file = "./visualizations/germanMusicScene.html")
 ```
 
 
@@ -435,6 +435,6 @@ n <- forceNetwork(
   legend = TRUE,
 )
 
-saveNetwork(n, file = "germanMusicScenePopularity.html")
+saveNetwork(n, file = "./visualizations/germanMusicSceneBasedOnPopularity.html")
 ```
 
