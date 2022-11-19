@@ -1,6 +1,3 @@
-Datensatz: spotify daten, diese bestehen aus edges und nodes. In edges sind Kollaborationen zwischen zwei Künstlern festgehalten. In den Nodes stehen Zusatzinformationen zu allen Künstlern wie Genre, Follower und Beliebtheit
-
-
 Einlesen der Datensätze
 ```{r}
 
@@ -16,12 +13,7 @@ edges <- read.csv("./data/edges.csv", header = TRUE)
 nodes <- read.csv("./data/nodes.csv", header = TRUE)
 ```
 
-
-1. Forschungsfrage zum Erkunden des Datensatzes:
-  Welches "Künstlerpaar" hatte die meisten Kollaborationen
-
-Benötigt werden hierfür sowohl Edges, als auch Nodes da in den Nodes die Künster nicht mit ihrem Namen enthalten sind, sondern mit einer eindeutigen Identifikationsnummer. Durch diese und die Nodes kann jeder ID der entsprechende Künstlername zugeordnet werden
-
+installieren aller benötigten Pakete
 ```{r}
 install_if_not("tidyverse")
 install_if_not("dplyr")
@@ -30,21 +22,15 @@ install_if_not("network")
 install_if_not("tibble")
 install_if_not("networkD3")
 install_if_not("data.table")
-library(networkD3)
-library(data.table)
+)
+
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
-
-
 filteredEdges <- edges[edges$id_0 %in% nodes$spotify_id, ]
 filteredEdges <- filteredEdges[filteredEdges$id_1 %in% nodes$spotify_id, ]
 
-# Anzahl der Künstler, die mehr als eine Kollaboration hatten:
-counts <- group_size(group_by(filteredEdges, id_0, id_1))
-counts[counts > 1]
 ```
-2. Forschungsfrage:
+1. Forschungsfrage:
   Welche Genres sind am häufigsten in dem Datensatz enthalten
-
 ```{r}
 
 numberOfGenres <- function(element) {
@@ -69,7 +55,6 @@ filteredEdges$genres <- paste(filteredEdges$genre_0, filteredEdges$genre_1, sep 
 # remove the columns genre_0 and genre_1
 filteredEdges <- filteredEdges[, -c(3, 4)]
 
-
 #  count the genres
 genreCounts <- table(unlist(strsplit(as.character(filteredEdges$genres), ", ")))
 genreCounts <- as.data.frame(genreCounts)
@@ -82,26 +67,33 @@ genreCounts$genre <- gsub("\\[", "", genreCounts$genre)
 genreCounts$genre <- gsub("\\]", "", genreCounts$genre)
 
 
-# plot the top 10 genres
+# plot the top 10 genres and safe plot to file
 ggplot(genreCounts[1:10, ], aes(x = reorder(genre, count), y = count)) +
   geom_bar(stat = "identity") +
   theme(axis.text.x = element_text(angle = 90, hjust = 1)) +
   labs(x = "Genre", y = "Count of Collaborations", title = "Top 10 Genres in the Dataset")
+ggsave("top10genres.png", width = 10, height = 5)
+
 
 # calculate mean number of genres per artist
-
 mean(unlist(lapply(filteredEdges$genres, numberOfGenres)))
+
+# get count of nodes where genre == []
+noGenre <- nodes %>%
+  filter(genres == "[]") %>%
+  count()
+
+# count of nodes with genre like "pop dance" and "dance pop"
+popDance <- nodes %>%
+  filter(genres %like% "pop dance" & genres %like% "dance pop") %>%
+  count()
+
+
 ```
 
--> Die häufigsten Genres sind Pop, edm und electro house
-  -> Dennoch sind die meisten Kollaborationen mit einem oder beiden Künstlern ohne zugeordnetes Genre
-  -> Durchschnittlich 4,9 genres pro Künsterin
 
-3. Forschungsfrage:
-  wie sind die einzelnen Genres untereinander vernetzt
 
-Hierfür wird lediglich ein genre pro Künstler betrachtet
-
+# to be deleted - just for testing
 
 ```{r}
 
@@ -154,13 +146,68 @@ ggplot(genreDegree[1:10, ], aes(x = reorder(genre, degree), y = degree)) +
 
 #  Genres sind alphabetisch sortiert - daher ist die Betrachtung lediglich des ersten Genres nicht repräsentativ
 ```
+3. Forschungsfrage:
+  Korrelation der Follower von Artist 1 und Artist 2
+```{r}
+# create new dataframe with the spotify_ids of the artists
+followerDataframe <- filteredEdges
 
+# replace the spotify id by the number of followers
+followerDataframe$id_0 <- nodes[match(followerDataframe$id_0, nodes$spotify_id), "followers"]
+followerDataframe$id_1 <- nodes[match(followerDataframe$id_1, nodes$spotify_id), "followers"]
 
-Weitere Idee:
-  Wie Kollaborieren die 20 größten Artists miteinander
-  Learning: 20 größten Artists hatten so viele Kollaborationen, dass die Visualisierung nicht mehr möglich war
-  -> Lediglich 5 Größten und deren Features wurden betrachtet
+# rename the columns
+colnames(followerDataframe) <- c("followers_0", "followers_1")
 
+# calculate the correlation of the followers
+cor(followerDataframe$followers_0, followerDataframe$followers_1, use = "complete.obs")
+```
+
+4. Forschungsfrage
+  Kennzahlen der deutschen und der internationalen Szene im Vergleich
+```{r}
+# get 5 biggest artist
+biggestArtists <- nodes %>%
+  arrange(desc(followers)) %>%
+  head(5)
+
+# get five biggest german artists
+biggestGermanArtists <- nodes %>%
+  filter(genres %like% "deutsch" | genres %like% "german") %>%
+  arrange(desc(followers)) %>%
+  head(5)
+
+# get the average followers of the biggest artists
+mean(biggestArtists$followers)
+mean(biggestGermanArtists$followers)
+
+# get the count of collaborations of the biggest artists
+biggestArtistsCollaborations <- filteredEdges %>%
+  filter(id_0 %in% biggestArtists$spotify_id | id_1 %in% biggestArtists$spotify_id) %>%
+  count()
+
+# get the count of collaborations of the biggest german artists
+biggestGermanArtistsCollaborations <- filteredEdges %>%
+  filter(id_0 %in% biggestGermanArtists$spotify_id | id_1 %in% biggestGermanArtists$spotify_id) %>%
+  count()
+
+# get the count of genres of the biggest artists
+genreCount <- nodes %>%
+  filter(spotify_id %in% biggestArtists$spotify_id) %>%
+  mutate(genres = strsplit(genres, ",")) %>%
+  unnest(genres) %>%
+  count(genres)
+
+# get the count of genres of the biggest german artists
+genreCountGerman <- nodes %>%
+  filter(spotify_id %in% biggestGermanArtists$spotify_id) %>%
+  mutate(genres = strsplit(genres, ",")) %>%
+  unnest(genres) %>%
+  count(genres)
+```
+
+5. Forschungsfrage:
+  Netzwerkplot international
 ```{r}
 # get the 5 biggest artists
 biggestArtists <- nodes[order(nodes$followers, decreasing = TRUE), ][1:5, ]
@@ -210,19 +257,13 @@ biggestArtistsNodes <- cbind(biggestArtistsNodes, isBiggestArtist = biggestArtis
 
 # drop spotify_id column
 biggestArtistsNodes <- biggestArtistsNodes[, -1]
-# print lines where isBiggestArtist is true
-biggestArtistsNodes[biggestArtistsNodes$isBiggestArtist == TRUE, ]
 
 # change the wording of isbiggestArtist to "TOP 5" or "OTHER"
 biggestArtistsNodes$isBiggestArtist <- ifelse(biggestArtistsNodes$isBiggestArtist == TRUE, "TOP 5", "OTHER")
 
-
-
 # lower source and target by 1
 biggestArtistsCollaborationsEdges$source <- biggestArtistsCollaborationsEdges$source - 1
 biggestArtistsCollaborationsEdges$target <- biggestArtistsCollaborationsEdges$target - 1
-p <- simpleNetwork(biggestArtistsCollaborationsEdges)
-saveNetwork(p, file = "biggestArtistsCollaborations.html")
 
 d <- forceNetwork(
   Links = biggestArtistsCollaborationsEdges,
@@ -243,30 +284,14 @@ d <- forceNetwork(
 saveNetwork(d, file = "biggestArtistsCollaborations2.html")
   ```
 
-```{r}
-data(MisLinks)
-data(MisNodes)
-
-d <- MisLinks
-n <- MisNodes
-```
-
-further Ideas:
-Betrachtung der Chartplazierungen:
-  - Wie spielen Followerzahl und Chartplazierung zusammen?
-  (Korrelationen)
-  (Followerzahl eines einzelnen Artists, sowie durchschnitt der  beiden)
-  - Wie spielen Genre und Chartplazierung zusammen?
-
-
-
+2. Forschungsfrage:
+  Welche Genres besitzen die größte Reichweite?
 ```{r}
 
 
 # get a list of all genres
 genres <- unlist(strsplit(nodes$genres, ","))
 # remove empty strings, remove whitespaces, [ and ], and ' from the strings
-genres <- gsub(" ", "", genres)
 genres <- gsub("\\[", "", genres)
 genres <- gsub("\\]", "", genres)
 genres <- gsub("'", "", genres)
@@ -275,13 +300,15 @@ genres <- genres[genres != ""]
 # get the unique genres
 genres <- unique(genres)
 
+length(genres)
 # create a dataframe with the genres and the number of followers
 genresFollowers <- data.frame(genre = genres, followers = 0)
 
 # create function to get the number of followers for a genre
 getFollowers <- function(genre) {
-  return(sum(nodes[nodes$name %like% sprintf("%s", genre), ]$followers))
+  return(sum(nodes[nodes$genres %like% genre, ]$followers))
 }
+
 
 # for each genre, add the followers of the artists that have this genre
 genresFollowers$followers <- sapply(genresFollowers$genre, getFollowers)
@@ -291,40 +318,34 @@ nodes[nodes$name %like% "'rap'", ]
 # sort the genres by the number of followers
 genresFollowers <- genresFollowers[order(genresFollowers$followers, decreasing = TRUE), ]
 
-# plot the genres with the most followers
+# plot the genres with the most followers and safe it as a png
 barplot(genresFollowers$followers, names.arg = genresFollowers$genre, las = 2, cex.names = 0.5, col = "blue")
+dev.copy(png, file = "genresFollowers.png")
+dev.off()
+
+# function to get average followers for a genre
+getAvgFollowers <- function(genre) {
+  return(mean(nodes[nodes$genres %like% genre, ]$followers))
+}
+
+# create a dataframe with the genres and the average number of followers
+genresAvgFollowers <- data.frame(genre = genres, avgFollowers = 0)
+
+# for each genre, add the average followers of the artists that have this genre
+genresAvgFollowers$avgFollowers <- sapply(genresAvgFollowers$genre, getAvgFollowers)
+
+# sort the genres by the average number of followers
+genresAvgFollowers <- genresAvgFollowers[order(genresAvgFollowers$avgFollowers, decreasing = TRUE), ]
+
+# plot the genres with the most average followers and safe it as a png
+barplot(genresAvgFollowers$avgFollowers, names.arg = genresAvgFollowers$genre, las = 2, cex.names = 0.5, col = "blue")
+dev.copy(png, file = "genresAvgFollowers.png")
+dev.off()
+
 ```
 
-Korrelation der Follower von Artist 1 und Artist 2
-
-```{r}
-# create new dataframe with the spotify_ids of the artists
-followerDataframe <- filteredEdges
-
-# replace the spotify id by the number of followers
-followerDataframe$id_0 <- nodes[match(followerDataframe$id_0, nodes$spotify_id), "followers"]
-followerDataframe$id_1 <- nodes[match(followerDataframe$id_1, nodes$spotify_id), "followers"]
-
-
-# rename the columns
-colnames(followerDataframe) <- c("followers_0", "followers_1")
-
-followerDataframe$followers_0
-
-# calculate the correlation of the followers
-cor(followerDataframe$followers_0, followerDataframe$followers_1, use = "complete.obs")
-```
-
-
-Betrachung der deutschen Musikszene:
-  -> zu groß für die Visualisierung
-      -> deutsche Rap szene auch zu groß
-       neuedeutschewelle
-
-
-WElche Genres haben die meisten follower
-
-
+5. Forschungsfrage
+  Plot der deutschen Musikszene
 ```{r}
 #  get all german artists in rap
 germanArtistsNodes <- nodes[nodes$genre %like% "german" | nodes$genre %like% "deutsch", ]
