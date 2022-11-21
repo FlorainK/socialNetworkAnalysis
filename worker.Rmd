@@ -2,6 +2,7 @@
 title: "SNA Projektarbeit Analyse eine Spotify Artis Feature Collaborations Netzwerks"
 author: "Florian Kenner"
 date: "2022-11-20"
+github: "https://github.com/FlorianKennerWI-DS/socialNetworkAnalysis"
 ---
 
 
@@ -32,6 +33,7 @@ install_if_not("data.table")
 install_if_not("ggplot2")
 install_if_not("plotly")
 install_if_not("webshot")
+install_if_not("comprehenr")
 
 # Entfernen der Zeilen, welche eine ID enthalten, die nicht in den nodes steht
 filteredEdges <- edges[edges$id_0 %in% nodes$spotify_id, ]
@@ -117,19 +119,16 @@ genres <- genres[genres != ""]
 # get the unique genres
 genres <- unique(genres)
 
-# create a dataframe with the genres and the number of followers
-genresFollowers <- data.frame(genre = genres, followers = 0)
-
-# get duplicates
-duplicates <- duplicated(genresFollowers$genre)
-
 # create function to get the number of followers for a genre
 getFollowers <- function(genre) {
   return(sum(nodes[nodes$genres %like% genre, ]$followers))
 }
+# create vector with the number of followers for each genre
+followers <- to_vec(for (genre in genres) getFollowers(genre))
 
-# for each genre, add the followers of the artists that have this genre
-genresFollowers$followers <- sapply(genresFollowers$genre, getFollowers)
+# create a dataframe with the genres and the number of followers
+
+genresFollowers <- data.frame(genre = genres, followers = followers)
 
 # sort the genres by the number of followers
 genresFollowers <- genresFollowers[order(genresFollowers$followers, decreasing = TRUE), ]
@@ -150,11 +149,12 @@ getAvgFollowers <- function(genre) {
   return(mean(nodes[nodes$genres %like% genre, ]$followers))
 }
 
-# create a dataframe with the genres and the average number of followers
-genresAvgFollowers <- data.frame(genre = genres, avgFollowers = 0)
+# create vector with the average followers for each genre
+avgFollowers <- to_vec(for (genre in genres) getAvgFollowers(genre))
 
-# for each genre, add the average followers of the artists that have this genre
-genresAvgFollowers$avgFollowers <- sapply(genresAvgFollowers$genre, getAvgFollowers)
+# create a dataframe with the genres and the average number of followers
+genresAvgFollowers <- data.frame(genre = genres, avgFollowers = avgFollowers)
+
 
 # sort the genres by the average number of followers
 genresAvgFollowers <- genresAvgFollowers[order(genresAvgFollowers$avgFollowers, decreasing = TRUE), ]
